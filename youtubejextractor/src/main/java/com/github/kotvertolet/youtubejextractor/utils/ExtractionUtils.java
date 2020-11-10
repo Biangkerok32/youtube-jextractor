@@ -7,47 +7,48 @@ import com.github.kotvertolet.youtubejextractor.exception.YoutubeRequestExceptio
 import com.google.code.regexp.Matcher;
 import com.google.code.regexp.Pattern;
 
-import java.util.ArrayList;
+import java.util.List;
 
-import static com.github.kotvertolet.youtubejextractor.utils.CommonUtils.getMatcher;
+import static com.github.kotvertolet.youtubejextractor.utils.CommonUtils.LogI;
+import static com.github.kotvertolet.youtubejextractor.utils.CommonUtils.matchWithPatterns;
+import static java.util.Arrays.asList;
 
 public class ExtractionUtils {
 
-    private ArrayList<String> patterns = new ArrayList<>();
-    {
-        patterns.add("\\b\\[cs\\]\\s*&&\\s*[adf]\\.set\\([^,]+\\s*,\\s*encodeURIComponent\\s*\\(\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
-        patterns.add("\\b[a-zA-Z0-9]+\\s*&&\\s*[a-zA-Z0-9]+\\.set\\([^,]+\\s*,\\s*encodeURIComponent\\s*\\(\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
-        patterns.add("(?<sig>[a-zA-Z0-9$]+)\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*\"\"\\s*\\)");
-        // Obsolete patterns
-        patterns.add("([\"\\'])signature\\1\\s*,\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
-        patterns.add("\\.sig\\|\\|(?<sig>[a-zA-Z0-9$]+)\\(");
-        patterns.add("yt\\.akamaized\\.net/\\)\\s*\\|\\|\\s*.*?\\s*c\\s*&&\\s*d\\.set\\([^,]+\\s*,\\s*(?:encodeURIComponent\\s*\\()?(?<sig>[a-zA-Z0-9$]+)\\(");
-        patterns.add("\\bc\\s*&&\\s*d\\.set\\([^,]+\\s*,\\s*(?:encodeURIComponent\\s*\\()?\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
-        patterns.add("\\bc\\s*&&\\s*d\\.set\\([^,]+\\s*,\\s*\\([^)]*\\)\\s*\\(\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
+    private YoutubePlayerUtils youtubePlayerUtils;
+
+    public ExtractionUtils(YoutubePlayerUtils youtubePlayerUtils) {
+        this.youtubePlayerUtils = youtubePlayerUtils;
     }
 
-    public static boolean isVideoAgeRestricted(String videoPageHtml) {
-        return videoPageHtml.contains("player-age-gate-content\">");
+    public boolean isVideoAgeRestricted(String videoPageHtml) {
+        return videoPageHtml.contains("LOGIN_REQUIRED");
     }
 
-    public static String extractStsFromVideoPageHtml(String embeddedVideoPageHtml) throws ExtractionException {
-        Matcher matcher = getMatcher("sts\"\\s*:\\s*(\\d+)", embeddedVideoPageHtml);
+    public String extractStsFromVideoPageHtml(String embeddedVideoPageHtml) {
+        Pattern pattern = Pattern.compile("sts\"\\s*:\\s*(\\d+)");
+        Matcher matcher = pattern.matcher(embeddedVideoPageHtml);
         if (matcher.find()) {
             return matcher.group(1);
-        } else
-            throw new ExtractionException("Sts param wasn't found in the embedded player webpage code");
+        } else {
+            LogI(ExtractionUtils.class.getSimpleName(), "Sts param wasn't found in the embedded player webpage code");
+            return "";
+        }
     }
 
     public String extractYoutubeVideoPlayerCode(String playerUrl) throws YoutubeRequestException, ExtractionException, SignatureDecryptionException {
         playerUrl = preparePlayerUrl(playerUrl);
-        Matcher matcher = getMatcher("([a-z]+)$", playerUrl);
+
+        Pattern pattern = Pattern.compile("([a-z]+)$");
+        Matcher matcher = pattern.matcher(playerUrl);
         if (!matcher.find()) {
             throw new ExtractionException("Cannot identify player type by url: " + playerUrl);
         }
+
         String playerType = matcher.group();
         switch (playerType) {
             case "js":
-                return YoutubePlayerUtils.downloadJsPlayer(playerUrl);
+                return youtubePlayerUtils.downloadJsPlayer(playerUrl);
             //TODO: This might be not necessary as swf player is outdated and not used anymore
             case "swf":
                 throw new UnsupportedOperationException("Swf player type is not supported");
@@ -57,15 +58,33 @@ public class ExtractionUtils {
     }
 
     public String extractDecryptFunctionName(String playerCode) throws ExtractionException {
-        String signatureDecryptFunctionName;
-        for (String pattern : patterns) {
-            Matcher matcher = getMatcher(pattern, playerCode);
-            if (matcher.find()) {
-                signatureDecryptFunctionName = matcher.group(1);
-                return signatureDecryptFunctionName;
-            }
+        Pattern newPattern1 = Pattern.compile("\\b\\[cs\\]\\s*&&\\s*[adf]\\.set\\([^,]+\\s*,\\s*encodeURIComponent\\s*\\(\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
+        Pattern newPattern2 = Pattern.compile("\\b[a-zA-Z0-9]+\\s*&&\\s*[a-zA-Z0-9]+\\.set\\([^,]+\\s*,\\s*encodeURIComponent\\s*\\(\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
+        Pattern newPattern3 = Pattern.compile("(?:\\b|[^a-zA-Z0-9$])(?<sig>[a-zA-Z0-9$]{2})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*\"\"\\s*\\)");
+        //Pattern newPattern3 = Pattern.compile("\\b(?<sig>[a-zA-Z0-9$]{2})\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*\"\"\\s*\\)");
+        Pattern newPattern4 = Pattern.compile("(?<sig>[a-zA-Z0-9$]+)\\s*=\\s*function\\(\\s*a\\s*\\)\\s*\\{\\s*a\\s*=\\s*a\\.split\\(\\s*\"\"\\s*\\)");
+        // Obsolete patterns
+        Pattern obsoletePattern1 = Pattern.compile("([\"\\'])signature\\1\\s*,\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
+        Pattern obsoletePattern2 = Pattern.compile("\\.sig\\|\\|(?<sig>[a-zA-Z0-9$]+)\\(");
+        Pattern obsoletePattern3 = Pattern.compile("yt\\.akamaized\\.net/\\)\\s*\\|\\|\\s*.*?\\s*c\\s*&&\\s*d\\.set\\([^,]+\\s*,\\s*(?:encodeURIComponent\\s*\\()?(?<sig>[a-zA-Z0-9$]+)\\(");
+        Pattern obsoletePattern4 = Pattern.compile("\\bc\\s*&&\\s*d\\.set\\([^,]+\\s*,\\s*(?:encodeURIComponent\\s*\\()?\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
+        Pattern obsoletePattern5 = Pattern.compile("\\bc\\s*&&\\s*d\\.set\\([^,]+\\s*,\\s*\\([^)]*\\)\\s*\\(\\s*(?<sig>[a-zA-Z0-9$]+)\\(");
+        List<Pattern> patterns = asList(
+                newPattern1,
+                newPattern2,
+                newPattern3,
+                newPattern4,
+                obsoletePattern1,
+                obsoletePattern2,
+                obsoletePattern3,
+                obsoletePattern4,
+                obsoletePattern5
+        );
+        String signatureDecryptFunctionName = matchWithPatterns(patterns, playerCode);
+        if (signatureDecryptFunctionName == null) {
+            throw new ExtractionException("Cannot find required JS function in JS video player code");
         }
-        throw new ExtractionException("Cannot find required JS function in JS video player code");
+        return signatureDecryptFunctionName;
     }
 
     private String preparePlayerUrl(String playerUrl) throws SignatureDecryptionException {

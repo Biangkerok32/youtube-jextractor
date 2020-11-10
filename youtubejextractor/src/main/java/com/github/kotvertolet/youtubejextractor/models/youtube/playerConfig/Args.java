@@ -1,8 +1,11 @@
 package com.github.kotvertolet.youtubejextractor.models.youtube.playerConfig;
 
+import com.github.kotvertolet.youtubejextractor.models.youtube.playerResponse.PlayerResponse;
 import com.google.gson.annotations.SerializedName;
 
-public class Args {
+import java.io.Serializable;
+
+public class Args implements Serializable {
 
     @SerializedName("show_content_thumbnail")
     private boolean showContentThumbnail;
@@ -65,7 +68,7 @@ public class Args {
     private String author;
 
     @SerializedName("player_response")
-    private String playerResponse;
+    private PlayerResponse playerResponse;
 
     @SerializedName("enabled_engage_types")
     private String enabledEngageTypes;
@@ -257,11 +260,11 @@ public class Args {
         this.author = author;
     }
 
-    public String getPlayerResponse() {
+    public PlayerResponse getPlayerResponse() {
         return playerResponse;
     }
 
-    public void setPlayerResponse(String playerResponse) {
+    public void setPlayerResponse(PlayerResponse playerResponse) {
         this.playerResponse = playerResponse;
     }
 

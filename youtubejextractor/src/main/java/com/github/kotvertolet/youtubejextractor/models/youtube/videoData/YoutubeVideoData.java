@@ -3,10 +3,13 @@ package com.github.kotvertolet.youtubejextractor.models.youtube.videoData;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import com.github.kotvertolet.youtubejextractor.models.youtube.playerResponse.RawStreamingData;
 import com.google.gson.annotations.SerializedName;
 
+import java.io.Serializable;
 
-public class YoutubeVideoData implements Parcelable {
+
+public class YoutubeVideoData implements Parcelable, Serializable {
 
     public static final Creator<YoutubeVideoData> CREATOR = new Creator<YoutubeVideoData>() {
         @Override
@@ -27,9 +30,9 @@ public class YoutubeVideoData implements Parcelable {
     public YoutubeVideoData() {
     }
 
-    public YoutubeVideoData(VideoDetails videoDetails, StreamingData streamingData) {
+    public YoutubeVideoData(VideoDetails videoDetails, RawStreamingData streamingData) {
         this.videoDetails = videoDetails;
-        this.streamingData = streamingData;
+        this.streamingData = new StreamingData(streamingData);
     }
 
     protected YoutubeVideoData(Parcel in) {
